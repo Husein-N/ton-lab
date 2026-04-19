@@ -225,12 +225,24 @@
         document.getElementById(`bal-${index}`).innerText = "Balance: error";
       }
     }
-
+    async function toRawAddress(friendlyAddress) {
+      const res = await fetch(`${API}/detectAddress?address=${encodeURIComponent(friendlyAddress)}&api_key=${API_KEY}`);
+      const data = await res.json();
+      return data.result?.raw_form; // returns "0:xxxx"
+    }
     async function loadDeposits() {
       const div = document.getElementById("deposit-list");
       div.innerHTML = "<p style='font-size:13px;color:#888;'>Loading...</p>";
-      let html = "";
 
+      // build raw address map for comparison
+      const rawAddresses = {};
+      for (const u of USERS) {
+        const raw = await toRawAddress(u.address);
+        rawAddresses[u.address] = raw;
+        await delay(200);
+      }
+
+      let html = "";
       for (const u of USERS) {
         html += `<strong>${u.name}</strong><div class="tx-list">`;
         try {
@@ -263,23 +275,18 @@
           const jettonUrl = `https://testnet.tonapi.io/v2/accounts/${encodeURIComponent(u.address)}/jettons/history?limit=10`;
           const jettonRes = await fetch(jettonUrl, { headers: { "Accept": "application/json" } });
           const jettonData = await jettonRes.json();
-          console.log(`${u.name} jetton history:`, jettonData);
 
-          if (jettonData.events) {
+          const userRaw = rawAddresses[u.address]; // e.g. "0:20e400..."
+
+          if (jettonData.operations && jettonData.operations.length > 0) {
             let foundJetton = false;
-            jettonData.events.forEach(event => {
-              event.actions?.forEach(action => {
-                if (action.type === "JettonTransfer") {
-                  const jt = action.JettonTransfer;
-                  console.log("JettonTransfer action:", jt);
-                  if (jt && jt.amount) {
-                    const amount = (parseInt(jt.amount) / 1e6).toFixed(2);
-                    const from = jt.sender?.address || "unknown";
-                    html += `<div class="tx-item" style="color:#0088cc;">🪙 +${amount} TUSDT from ${from.slice(0, 10)}...</div>`;
-                    foundJetton = true;
-                  }
-                }
-              });
+            jettonData.operations.forEach(op => {
+              if (op.destination?.address === userRaw && op.amount) {
+                const amount = (parseInt(op.amount) / 1e6).toFixed(2);
+                const from = op.source?.address ? op.source.address.slice(0, 10) : "minted";
+                html += `<div class="tx-item" style="color:#0088cc;">🪙 +${amount} TUSDT from ${from}...</div>`;
+                foundJetton = true;
+              }
             });
             if (!foundJetton) html += `<div class="tx-item" style="color:#aaa;">No TUSDT deposits</div>`;
           } else {

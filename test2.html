@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Jetton History Test</title>
+</head>
+
+<body>
+  <h2>Jetton History Test</h2>
+  <pre id="result">Testing...</pre>
+
+  <script>
+    const USER1 = "0QAg5ACu5HFqX3aBWBr8MOxMGQ670oviskmVGIAdoZInTq5E";
+
+    fetch(`https://testnet.tonapi.io/v2/accounts/${encodeURIComponent(USER1)}/jettons/history?limit=10`, {
+      headers: { "Accept": "application/json" }
+    })
+      .then(r => r.json())
+      .then(d => {
+        document.getElementById("result").innerText = JSON.stringify(d, null, 2);
+      })
+      .catch(e => {
+        document.getElementById("result").innerText = "ERROR: " + e.message;
+      });
+  </script>
+</body>
+
+</html>
