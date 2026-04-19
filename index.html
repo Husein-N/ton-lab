@@ -282,9 +282,15 @@
             let foundJetton = false;
             jettonData.operations.forEach(op => {
               if (op.destination?.address === userRaw && op.amount) {
-                const amount = (parseInt(op.amount) / 1e6).toFixed(2);
-                const from = op.source?.address ? op.source.address.slice(0, 10) : "minted";
-                html += `<div class="tx-item" style="color:#0088cc;">🪙 +${amount} TUSDT from ${from}...</div>`;
+                const rawAmount = parseInt(op.amount);
+                if (rawAmount < 1000) return; // skip dust/failed amounts
+                const amount = (rawAmount / 1e6).toFixed(2);
+                if (op.operation === "mint") {
+                  html += `<div class="tx-item" style="color:#9b59b6;">🏭 +${amount} TUSDT (minted)</div>`;
+                } else {
+                  const from = op.source?.address ? op.source.address.slice(0, 10) : "unknown";
+                  html += `<div class="tx-item" style="color:#0088cc;">🪙 +${amount} TUSDT from ${from}...</div>`;
+                }
                 foundJetton = true;
               }
             });
