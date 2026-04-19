@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TON Lab 7-8</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: sans-serif;
+      background: #f4f4f4;
+      padding: 20px;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+    }
+
+    .section {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      border: 1px solid #ddd;
+    }
+
+    h2 {
+      margin-bottom: 12px;
+      font-size: 18px;
+    }
+
+    .user-card {
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 10px;
+      background: #fafafa;
+    }
+
+    .user-card h3 {
+      font-size: 15px;
+      margin-bottom: 4px;
+    }
+
+    .user-card p {
+      font-size: 12px;
+      color: #555;
+      word-break: break-all;
+    }
+
+    .balance {
+      font-size: 13px;
+      margin-top: 6px;
+      color: #333;
+    }
+
+    button {
+      padding: 8px 16px;
+      background: #0088cc;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+
+    button:hover {
+      background: #006699;
+    }
+
+    input,
+    select {
+      width: 100%;
+      padding: 8px;
+      margin-top: 6px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    label {
+      font-size: 13px;
+      color: #444;
+      margin-top: 10px;
+      display: block;
+    }
+
+    .tx-list {
+      font-size: 13px;
+    }
+
+    .tx-item {
+      padding: 6px 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    .status {
+      font-size: 13px;
+      color: green;
+      margin-top: 8px;
+    }
+  </style>
+  <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+</head>
+
+<body>
+
+  <h1>TON Testnet Lab</h1>
+
+  <!-- SECTION 1: Users -->
+  <div class="section">
+    <h2>Users</h2>
+    <div id="user-list"></div>
+  </div>
+
+  <!-- SECTION 2: Send TON -->
+  <div class="section">
+    <h2>Send TON</h2>
+    <div id="ton-connect"></div>
+    <div id="wallet-info" style="font-size:13px;color:#555;margin-top:8px;"></div>
+
+    <div id="send-ton-form" style="display:none;margin-top:12px;">
+      <label>To (select user)</label>
+      <select id="ton-to">
+        <option value="0QD3aw_WVwffsZkG9W9g4pVyXKg1hUf8MZWqQme1wF7wBF-k">User 2</option>
+        <option value="0QDkivCpAcuuZps93al_l2SkekA0ln-gqB-5mT2ayMb9Uhfs">User 3</option>
+      </select>
+      <label>Amount (TON)</label>
+      <input type="number" id="ton-amount" placeholder="e.g. 0.1" step="0.01" min="0.01" />
+      <button onclick="sendTon()">Send TON</button>
+      <div class="status" id="ton-status"></div>
+    </div>
+  </div>
+
+  <!-- SECTION 3: Send USDT -->
+  <div class="section">
+    <h2>Send USDT Jetton</h2>
+    <p style="font-size:13px;color:#888;">Coming soon</p>
+  </div>
+
+  <!-- SECTION 4: Deposits -->
+  <div class="section">
+    <h2>Deposit History</h2>
+    <div id="deposit-list">
+      <p style="font-size:13px;color:#888;">Loading...</p>
+    </div>
+    <button onclick="loadDeposits()">Refresh Deposits</button>
+  </div>
+
+  <script>
+    const USERS = [
+      { name: "User 1", address: "0QAg5ACu5HFqX3aBWBr8MOxMGQ670oviskmVGIAdoZInTq5E" },
+      { name: "User 2", address: "0QD3aw_WVwffsZkG9W9g4pVyXKg1hUf8MZWqQme1wF7wBF-k" },
+      { name: "User 3", address: "0QDkivCpAcuuZps93al_l2SkekA0ln-gqB-5mT2ayMb9Uhfs" },
+    ];
+
+    const API = "https://testnet.toncenter.com/api/v2";
+    const API_KEY = "9273b1bd58d156d4079e983b1113f6a67ddc96d83b971341f26c0f504979172c"; // <-- paste your key here
+
+    function delay(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function buildUrl(method, params) {
+      const query = Object.entries(params)
+        .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+        .join("&");
+      return `${API}/${method}?${query}&api_key=${API_KEY}`;
+    }
+
+    function renderUsers() {
+      const list = document.getElementById("user-list");
+      list.innerHTML = USERS.map((u, i) => `
+        <div class="user-card">
+          <h3>${u.name}</h3>
+          <p>${u.address}</p>
+          <div class="balance" id="bal-${i}">Balance: loading...</div>
+        </div>
+      `).join("");
+      loadAllBalances();
+    }
+
+    async function loadAllBalances() {
+      for (let i = 0; i < USERS.length; i++) {
+        await loadBalance(USERS[i].address, i);
+        await delay(300);
+      }
+    }
+
+    async function loadBalance(address, index) {
+      try {
+        const url = buildUrl("getAddressInformation", { address });
+        console.log("Fetching balance:", url);
+        const res = await fetch(url);
+        const data = await res.json();
+        const raw = data.result?.balance;
+        const ton = raw ? (parseInt(raw) / 1e9).toFixed(2) : "0.00";
+        document.getElementById(`bal-${index}`).innerText = `Balance: ${ton} TON`;
+      } catch (e) {
+        console.error("Balance error:", e);
+        document.getElementById(`bal-${index}`).innerText = "Balance: error";
+      }
+    }
+
+    async function loadDeposits() {
+      const div = document.getElementById("deposit-list");
+      div.innerHTML = "<p style='font-size:13px;color:#888;'>Loading...</p>";
+      let html = "";
+      for (const u of USERS) {
+        try {
+          await delay(300);
+          const url = buildUrl("getTransactions", { address: u.address, limit: 5 });
+          console.log("Fetching transactions:", url);
+          const res = await fetch(url);
+          const data = await res.json();
+
+          if (!data.ok) {
+            html += `<strong>${u.name}</strong><div class="tx-list"><div class="tx-item" style="color:orange;">API error: ${data.error}</div></div><br>`;
+            continue;
+          }
+
+          const txs = data.result || [];
+          html += `<strong>${u.name}</strong><div class="tx-list">`;
+          if (txs.length === 0) {
+            html += `<div class="tx-item">No transactions yet</div>`;
+          } else {
+            txs.forEach(tx => {
+              const rawValue = parseInt(tx.in_msg?.value || "0");
+              if (rawValue > 0) {
+                const val = (rawValue / 1e9).toFixed(3);
+                const from = tx.in_msg.source || "unknown";
+                html += `<div class="tx-item">+${val} TON from ${from.slice(0, 10)}...</div>`;
+              }
+            });
+          }
+          html += `</div><br>`;
+        } catch (e) {
+          console.error(`${u.name} error:`, e);
+          html += `<p style='font-size:13px;color:red;'>${u.name}: error - ${e.message}</p>`;
+        }
+      }
+      div.innerHTML = html;
+    }
+
+    const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+      manifestUrl: "http://localhost:5500/tonconnect-manifest.json",
+      buttonRootId: "ton-connect"
+    });
+
+    tonConnectUI.onStatusChange(wallet => {
+      const info = document.getElementById("wallet-info");
+      const form = document.getElementById("send-ton-form");
+      if (wallet) {
+        const addr = wallet.account.address;
+        info.innerText = `Connected: ${addr.slice(0, 10)}...${addr.slice(-6)}`;
+        form.style.display = "block";
+      } else {
+        info.innerText = "Not connected";
+        form.style.display = "none";
+      }
+    });
+
+    async function sendTon() {
+      const to = document.getElementById("ton-to").value;
+      const amount = parseFloat(document.getElementById("ton-amount").value);
+      const status = document.getElementById("ton-status");
+
+      if (!amount || amount <= 0) {
+        status.style.color = "red";
+        status.innerText = "Enter a valid amount.";
+        return;
+      }
+
+      try {
+        status.style.color = "#888";
+        status.innerText = "Waiting for confirmation in Tonkeeper...";
+        const nanotons = Math.floor(amount * 1e9).toString();
+        await tonConnectUI.sendTransaction({
+          validUntil: Math.floor(Date.now() / 1000) + 60,
+          messages: [{ address: to, amount: nanotons }]
+        });
+        status.style.color = "green";
+        status.innerText = "Transaction sent!";
+        setTimeout(() => { renderUsers(); loadDeposits(); }, 5000);
+      } catch (e) {
+        status.style.color = "red";
+        status.innerText = "Error: " + e.message;
+      }
+    }
+    renderUsers();
+    loadDeposits();
+  </script>
+</body>
+
+</html>

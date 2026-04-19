@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>API Test</title>
+</head>
+
+<body>
+  <h2>TON API Test</h2>
+  <pre id="result">Testing...</pre>
+
+  <script>
+    const API_KEY = "9273b1bd58d156d4079e983b1113f6a67ddc96d83b971341f26c0f504979172c"; // paste your key
+    const ADDRESS = "0QAg5ACu5HFqX3aBWBr8MOxMGQ670oviskmVGIAdoZInTq5E";
+    const URL = `https://testnet.toncenter.com/api/v2/getAddressInformation?address=${ADDRESS}&api_key=${API_KEY}`;
+
+    document.getElementById("result").innerText = "Fetching: " + URL + "\n\nWaiting...";
+
+    fetch(URL)
+      .then(r => r.json())
+      .then(d => {
+        document.getElementById("result").innerText = JSON.stringify(d, null, 2);
+      })
+      .catch(e => {
+        document.getElementById("result").innerText = "ERROR: " + e.message;
+      });
+  </script>
+</body>
+
+</html>
