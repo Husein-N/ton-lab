@@ -230,37 +230,55 @@
       div.innerHTML = "<p style='font-size:13px;color:#888;'>Loading...</p>";
       let html = "";
       for (const u of USERS) {
+        html += `<strong>${u.name}</strong><div class="tx-list">`;
         try {
           await delay(300);
-          const url = buildUrl("getTransactions", { address: u.address, limit: 5 });
-          console.log("Fetching transactions:", url);
+
+          // TON deposits
+          const url = buildUrl("getTransactions", { address: u.address, limit: 10 });
           const res = await fetch(url);
           const data = await res.json();
 
           if (!data.ok) {
-            html += `<strong>${u.name}</strong><div class="tx-list"><div class="tx-item" style="color:orange;">API error: ${data.error}</div></div><br>`;
-            continue;
-          }
-
-          const txs = data.result || [];
-          html += `<strong>${u.name}</strong><div class="tx-list">`;
-          if (txs.length === 0) {
-            html += `<div class="tx-item">No transactions yet</div>`;
+            html += `<div class="tx-item" style="color:orange;">API error: ${data.error}</div>`;
           } else {
+            const txs = data.result || [];
+            let found = false;
             txs.forEach(tx => {
               const rawValue = parseInt(tx.in_msg?.value || "0");
-              if (rawValue > 0) {
+              if (rawValue >= 1000000) { // only show > 0.001 TON to filter out gas
                 const val = (rawValue / 1e9).toFixed(3);
                 const from = tx.in_msg.source || "unknown";
-                html += `<div class="tx-item">+${val} TON from ${from.slice(0, 10)}...</div>`;
+                html += `<div class="tx-item">💎 +${val} TON from ${from.slice(0, 10)}...</div>`;
+                found = true;
               }
             });
+            if (!found) html += `<div class="tx-item">No TON deposits</div>`;
           }
-          html += `</div><br>`;
+
+          // TUSDT deposits
+          await delay(300);
+          const jettonUrl = `https://testnet.tonapi.io/v2/accounts/${encodeURIComponent(u.address)}/jettons/${encodeURIComponent(TUSDT_MASTER)}/history?limit=5`;
+          const jettonRes = await fetch(jettonUrl, { headers: { "Accept": "application/json" } });
+          const jettonData = await jettonRes.json();
+
+          if (jettonData.events) {
+            jettonData.events.forEach(event => {
+              event.actions?.forEach(action => {
+                if (action.type === "JettonTransfer" && action.JettonTransfer?.recipient?.address === u.address) {
+                  const amount = (parseInt(action.JettonTransfer.amount) / 1e6).toFixed(2);
+                  const from = action.JettonTransfer.sender?.address || "unknown";
+                  html += `<div class="tx-item" style="color:#0088cc;">🪙 +${amount} TUSDT from ${from.slice(0, 10)}...</div>`;
+                }
+              });
+            });
+          }
+
         } catch (e) {
           console.error(`${u.name} error:`, e);
-          html += `<p style='font-size:13px;color:red;'>${u.name}: error - ${e.message}</p>`;
+          html += `<div class="tx-item" style="color:red;">Error loading</div>`;
         }
+        html += `</div><br>`;
       }
       div.innerHTML = html;
     }
