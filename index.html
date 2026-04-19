@@ -330,7 +330,7 @@
     async function sendTUSDT() {
       const from = document.getElementById("tusdt-from").value;
       const to = document.getElementById("tusdt-to").value;
-      const amount = parseInt(document.getElementById("tusdt-amount").value);
+      const amount = parseInt(document.getElementById("tusdt-amount").value) * 1_000_000;
       const status = document.getElementById("tusdt-status");
 
       if (from === to) {
