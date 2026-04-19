@@ -196,18 +196,20 @@
     function renderUsers() {
       const list = document.getElementById("user-list");
       list.innerHTML = USERS.map((u, i) => `
-        <div class="user-card">
-          <h3>${u.name}</h3>
-          <p>${u.address}</p>
-          <div class="balance" id="bal-${i}">Balance: loading...</div>
-        </div>
-      `).join("");
+    <div class="user-card">
+      <h3>${u.name}</h3>
+      <p>${u.address}</p>
+      <div class="balance" id="bal-${i}">💎 TON: loading...</div>
+      <div class="balance" id="jbal-${i}">💵 TUSDT: loading...</div>
+    </div>
+  `).join("");
       loadAllBalances();
     }
 
     async function loadAllBalances() {
       for (let i = 0; i < USERS.length; i++) {
         await loadBalance(USERS[i].address, i);
+        await loadJettonBalance(USERS[i].address, i);
         await delay(300);
       }
     }
@@ -223,6 +225,18 @@
       } catch (e) {
         console.error("Balance error:", e);
         document.getElementById(`bal-${index}`).innerText = "Balance: error";
+      }
+    }
+    async function loadJettonBalance(address, index) {
+      try {
+        const url = `https://testnet.tonapi.io/v2/accounts/${encodeURIComponent(address)}/jettons?currencies=usd`;
+        const res = await fetch(url, { headers: { "Accept": "application/json" } });
+        const data = await res.json();
+        const jetton = data.balances?.find(b => b.jetton?.address === "0:161b96b48b0d5abed5cc03727edab3b39d2dddf5e0736781cc5374c68f984206");
+        const amount = jetton ? (parseInt(jetton.balance) / 1e6).toFixed(2) : "0.00";
+        document.getElementById(`jbal-${index}`).innerText = `💵 TUSDT: ${amount}`;
+      } catch (e) {
+        document.getElementById(`jbal-${index}`).innerText = "💵 TUSDT: error";
       }
     }
     async function toRawAddress(friendlyAddress) {
@@ -283,8 +297,7 @@
             jettonData.operations.forEach(op => {
               if (op.destination?.address === userRaw && op.amount) {
                 const rawAmount = parseInt(op.amount);
-                if (rawAmount < 1000) return; // skip dust/failed amounts
-                const amount = (rawAmount / 1e6).toFixed(2);
+                if (rawAmount < 10000) return; // skip dust/failed amounts (< 0.01 TUSDT)                const amount = (rawAmount / 1e6).toFixed(2);
                 if (op.operation === "mint") {
                   html += `<div class="tx-item" style="color:#9b59b6;">🏭 +${amount} TUSDT (minted)</div>`;
                 } else {
