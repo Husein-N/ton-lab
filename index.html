@@ -5,7 +5,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>TON Lab 7-8</title>
-  <script src="https://unpkg.com/tonweb@0.0.60/dist/tonweb.js"></script>
   <style>
     * {
       box-sizing: border-box;
@@ -119,19 +118,7 @@
     <h2>Users</h2>
     <div id="user-list"></div>
   </div>
-  <!-- SECTION: Mint TUSDT -->
-  <div class="section">
-    <h2>Mint TUSDT (Owner Only)</h2>
-    <label>Receiver</label>
-    <select id="mint-to">
-      <option value="0QD3aw_WVwffsZkG9W9g4pVyXKg1hUf8MZWqQme1wF7wBF-k">User 2</option>
-      <option value="0QDkivCpAcuuZps93al_l2SkekA0ln-gqB-5mT2ayMb9Uhfs">User 3</option>
-    </select>
-    <label>Amount (TUSDT)</label>
-    <input type="number" id="mint-amount" placeholder="e.g. 100000" value="100000" />
-    <button onclick="mintTUSDT()">Mint TUSDT</button>
-    <div class="status" id="mint-status"></div>
-  </div>
+
   <!-- SECTION 2: Send TON -->
   <div class="section">
     <h2>Send TON</h2>
@@ -306,52 +293,10 @@
         status.innerText = "Error: " + e.message;
       }
     }
-    const TUSDT_MASTER = "kQAWG5a0iw1avtXMA3J-2rOznS3d9eBzZ4HMU3TGj5hCBld3";
 
-    async function mintTUSDT() {
-      const to = document.getElementById("mint-to").value;
-      const amount = parseInt(document.getElementById("mint-amount").value);
-      const status = document.getElementById("mint-status");
 
-      if (!amount || amount <= 0) {
-        status.style.color = "red";
-        status.innerText = "Enter a valid amount.";
-        return;
-      }
 
-      try {
-        status.style.color = "#888";
-        status.innerText = "Waiting for confirmation in Tonkeeper...";
 
-        // Mint message body: op=0x00000015 + query_id + amount + receiver
-        const cell = new TonWeb.boc.Cell();
-        cell.bits.writeUint(0x00000015, 32); // mint op code
-        cell.bits.writeUint(0, 64);          // query id
-        cell.bits.writeCoins(amount);        // amount
-        // receiver address stored as reference
-        const addrCell = new TonWeb.boc.Cell();
-        addrCell.bits.writeAddress(new TonWeb.utils.Address(to));
-        cell.refs.push(addrCell);
-
-        const boc = await cell.toBoc();
-        const payload = TonWeb.utils.bytesToBase64(boc);
-
-        await tonConnectUI.sendTransaction({
-          validUntil: Math.floor(Date.now() / 1000) + 60,
-          messages: [{
-            address: TUSDT_MASTER,
-            amount: "100000000", // 0.1 TON for gas
-            payload: payload
-          }]
-        });
-
-        status.style.color = "green";
-        status.innerText = "Mint transaction sent! Check Tonkeeper.";
-      } catch (e) {
-        status.style.color = "red";
-        status.innerText = "Error: " + e.message;
-      }
-    }
     renderUsers();
     loadDeposits();
   </script>
