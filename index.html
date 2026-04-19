@@ -258,172 +258,173 @@
 
           // TUSDT deposits
           await delay(300);
-          const jettonUrl = `https://testnet.tonapi.io/v2/accounts/${encodeURIComponent(u.address)}/jettons/${encodeURIComponent(TUSDT_MASTER)}/history?limit=5`;
+          const jettonUrl = `https://testnet.tonapi.io/v2/accounts/${encodeURIComponent(u.address)}/jettons/history?limit=10`;
           const jettonRes = await fetch(jettonUrl, { headers: { "Accept": "application/json" } });
           const jettonData = await jettonRes.json();
+          console.log(`${u.name} jetton history:`, jettonData);
 
           if (jettonData.events) {
+            let foundJetton = false;
             jettonData.events.forEach(event => {
               event.actions?.forEach(action => {
-                if (action.type === "JettonTransfer" && action.JettonTransfer?.recipient?.address === u.address) {
-                  const amount = (parseInt(action.JettonTransfer.amount) / 1e6).toFixed(2);
-                  const from = action.JettonTransfer.sender?.address || "unknown";
-                  html += `<div class="tx-item" style="color:#0088cc;">🪙 +${amount} TUSDT from ${from.slice(0, 10)}...</div>`;
+                if (action.type === "JettonTransfer") {
+                  const jt = action.JettonTransfer;
+                  console.log("JettonTransfer action:", jt);
+                  if (jt && jt.jetton?.address && jt.recipients_wallet) {
+                    const amount = (parseInt(jt.amount) / 1e6).toFixed(2);
+                    const from = jt.sender?.address || "unknown";
+                    html += `<div class="tx-item" style="color:#0088cc;">🪙 +${amount} TUSDT from ${from.slice(0, 10)}...</div>`;
+                    foundJetton = true;
+                  }
                 }
               });
             });
+            if (!foundJetton) html += `<div class="tx-item" style="color:#aaa;">No TUSDT deposits</div>`;
+          } else {
+            html += `<div class="tx-item" style="color:#aaa;">No TUSDT deposits</div>`;
           }
 
-        } catch (e) {
-          console.error(`${u.name} error:`, e);
-          html += `<div class="tx-item" style="color:red;">Error loading</div>`;
-        }
-        html += `</div><br>`;
-      }
-      div.innerHTML = html;
-    }
+          const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+            manifestUrl: "https://husein-n.github.io/ton-lab/tonconnect-manifest.json",
+            buttonRootId: "ton-connect"
+          });
 
-    const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
-      manifestUrl: "https://husein-n.github.io/ton-lab/tonconnect-manifest.json",
-      buttonRootId: "ton-connect"
-    });
+          tonConnectUI.onStatusChange(wallet => {
+            const info = document.getElementById("wallet-info");
+            const form = document.getElementById("send-ton-form");
+            if (wallet) {
+              const addr = wallet.account.address;
+              info.innerText = `Connected: ${addr.slice(0, 10)}...${addr.slice(-6)}`;
+              form.style.display = "block";
+            } else {
+              info.innerText = "Not connected";
+              form.style.display = "none";
+            }
+          });
 
-    tonConnectUI.onStatusChange(wallet => {
-      const info = document.getElementById("wallet-info");
-      const form = document.getElementById("send-ton-form");
-      if (wallet) {
-        const addr = wallet.account.address;
-        info.innerText = `Connected: ${addr.slice(0, 10)}...${addr.slice(-6)}`;
-        form.style.display = "block";
-      } else {
-        info.innerText = "Not connected";
-        form.style.display = "none";
-      }
-    });
+          async function sendTon() {
+            const to = document.getElementById("ton-to").value;
+            const amount = parseFloat(document.getElementById("ton-amount").value);
+            const status = document.getElementById("ton-status");
 
-    async function sendTon() {
-      const to = document.getElementById("ton-to").value;
-      const amount = parseFloat(document.getElementById("ton-amount").value);
-      const status = document.getElementById("ton-status");
+            if (!amount || amount <= 0) {
+              status.style.color = "red";
+              status.innerText = "Enter a valid amount.";
+              return;
+            }
 
-      if (!amount || amount <= 0) {
-        status.style.color = "red";
-        status.innerText = "Enter a valid amount.";
-        return;
-      }
+            try {
+              status.style.color = "#888";
+              status.innerText = "Waiting for confirmation in Tonkeeper...";
+              const nanotons = Math.floor(amount * 1e9).toString();
+              await tonConnectUI.sendTransaction({
+                validUntil: Math.floor(Date.now() / 1000) + 60,
+                messages: [{ address: to, amount: nanotons }]
+              });
+              status.style.color = "green";
+              status.innerText = "Transaction sent!";
+              setTimeout(() => { renderUsers(); loadDeposits(); }, 5000);
+            } catch (e) {
+              status.style.color = "red";
+              status.innerText = "Error: " + e.message;
+            }
+          }
+          const TUSDT_MASTER = "0QAWG5a0iw1avtXMA3J-2rOznS3d9eBzZ4HMU3TGj5hCBgqy";
 
-      try {
-        status.style.color = "#888";
-        status.innerText = "Waiting for confirmation in Tonkeeper...";
-        const nanotons = Math.floor(amount * 1e9).toString();
-        await tonConnectUI.sendTransaction({
-          validUntil: Math.floor(Date.now() / 1000) + 60,
-          messages: [{ address: to, amount: nanotons }]
-        });
-        status.style.color = "green";
-        status.innerText = "Transaction sent!";
-        setTimeout(() => { renderUsers(); loadDeposits(); }, 5000);
-      } catch (e) {
-        status.style.color = "red";
-        status.innerText = "Error: " + e.message;
-      }
-    }
-    const TUSDT_MASTER = "0QAWG5a0iw1avtXMA3J-2rOznS3d9eBzZ4HMU3TGj5hCBgqy";
+          async function getJettonWalletAddress(ownerAddress) {
+            try {
+              const url = `https://testnet.tonapi.io/v2/blockchain/accounts/${encodeURIComponent(TUSDT_MASTER)}/methods/get_wallet_address?args=${encodeURIComponent(ownerAddress)}`;
+              const res = await fetch(url, {
+                headers: { "Accept": "application/json" }
+              });
+              const data = await res.json();
+              console.log("Jetton wallet response:", data);
+              return data.decoded?.jetton_wallet_address;
+            } catch (e) {
+              console.error("getJettonWalletAddress error:", e);
+              return null;
+            }
+          }
 
-    async function getJettonWalletAddress(ownerAddress) {
-      try {
-        const url = `https://testnet.tonapi.io/v2/blockchain/accounts/${encodeURIComponent(TUSDT_MASTER)}/methods/get_wallet_address?args=${encodeURIComponent(ownerAddress)}`;
-        const res = await fetch(url, {
-          headers: { "Accept": "application/json" }
-        });
-        const data = await res.json();
-        console.log("Jetton wallet response:", data);
-        return data.decoded?.jetton_wallet_address;
-      } catch (e) {
-        console.error("getJettonWalletAddress error:", e);
-        return null;
-      }
-    }
+          async function sendTUSDT() {
+            const from = document.getElementById("tusdt-from").value;
+            const to = document.getElementById("tusdt-to").value;
+            const amount = parseInt(document.getElementById("tusdt-amount").value) * 1_000_000;
+            const status = document.getElementById("tusdt-status");
 
-    async function sendTUSDT() {
-      const from = document.getElementById("tusdt-from").value;
-      const to = document.getElementById("tusdt-to").value;
-      const amount = parseInt(document.getElementById("tusdt-amount").value) * 1_000_000;
-      const status = document.getElementById("tusdt-status");
+            if (from === to) {
+              status.style.color = "red";
+              status.innerText = "Sender and receiver cannot be the same.";
+              return;
+            }
 
-      if (from === to) {
-        status.style.color = "red";
-        status.innerText = "Sender and receiver cannot be the same.";
-        return;
-      }
+            if (!amount || amount <= 0) {
+              status.style.color = "red";
+              status.innerText = "Enter a valid amount.";
+              return;
+            }
 
-      if (!amount || amount <= 0) {
-        status.style.color = "red";
-        status.innerText = "Enter a valid amount.";
-        return;
-      }
+            try {
+              status.style.color = "#888";
+              status.innerText = "Getting jetton wallet address...";
 
-      try {
-        status.style.color = "#888";
-        status.innerText = "Getting jetton wallet address...";
+              // get raw jetton wallet address
+              const rawJettonWallet = await getJettonWalletAddress(from);
+              if (!rawJettonWallet) {
+                status.style.color = "red";
+                status.innerText = "Could not find jetton wallet for sender.";
+                return;
+              }
 
-        // get raw jetton wallet address
-        const rawJettonWallet = await getJettonWalletAddress(from);
-        if (!rawJettonWallet) {
-          status.style.color = "red";
-          status.innerText = "Could not find jetton wallet for sender.";
-          return;
-        }
+              // convert raw address to friendly format using TONCenter
+              const detectUrl = `https://testnet.toncenter.com/api/v2/detectAddress?address=${encodeURIComponent(rawJettonWallet)}&api_key=${API_KEY}`;
+              const detectRes = await fetch(detectUrl);
+              const detectData = await detectRes.json();
+              const jettonWalletAddress = detectData.result?.bounceable?.b64url;
 
-        // convert raw address to friendly format using TONCenter
-        const detectUrl = `https://testnet.toncenter.com/api/v2/detectAddress?address=${encodeURIComponent(rawJettonWallet)}&api_key=${API_KEY}`;
-        const detectRes = await fetch(detectUrl);
-        const detectData = await detectRes.json();
-        const jettonWalletAddress = detectData.result?.bounceable?.b64url;
+              console.log("Jetton wallet friendly address:", jettonWalletAddress);
 
-        console.log("Jetton wallet friendly address:", jettonWalletAddress);
+              if (!jettonWalletAddress) {
+                status.style.color = "red";
+                status.innerText = "Could not convert jetton wallet address.";
+                return;
+              }
 
-        if (!jettonWalletAddress) {
-          status.style.color = "red";
-          status.innerText = "Could not convert jetton wallet address.";
-          return;
-        }
+              status.innerText = "Waiting for confirmation in Tonkeeper...";
 
-        status.innerText = "Waiting for confirmation in Tonkeeper...";
+              const TW = window.TonWeb;
+              const body = new TW.boc.Cell();
+              body.bits.writeUint(0xf8a7ea5, 32);
+              body.bits.writeUint(0, 64);
+              body.bits.writeCoins(amount);
+              body.bits.writeAddress(new TW.utils.Address(to));
+              body.bits.writeAddress(new TW.utils.Address(from));
+              body.bits.writeBit(0);
+              body.bits.writeCoins(1);
+              body.bits.writeBit(0);
 
-        const TW = window.TonWeb;
-        const body = new TW.boc.Cell();
-        body.bits.writeUint(0xf8a7ea5, 32);
-        body.bits.writeUint(0, 64);
-        body.bits.writeCoins(amount);
-        body.bits.writeAddress(new TW.utils.Address(to));
-        body.bits.writeAddress(new TW.utils.Address(from));
-        body.bits.writeBit(0);
-        body.bits.writeCoins(1);
-        body.bits.writeBit(0);
+              const boc = await body.toBoc();
+              const payload = TW.utils.bytesToBase64(boc);
 
-        const boc = await body.toBoc();
-        const payload = TW.utils.bytesToBase64(boc);
+              await tonConnectUI.sendTransaction({
+                validUntil: Math.floor(Date.now() / 1000) + 60,
+                messages: [{
+                  address: jettonWalletAddress,
+                  amount: "50000000",
+                  payload: payload
+                }]
+              });
 
-        await tonConnectUI.sendTransaction({
-          validUntil: Math.floor(Date.now() / 1000) + 60,
-          messages: [{
-            address: jettonWalletAddress,
-            amount: "50000000",
-            payload: payload
-          }]
-        });
-
-        status.style.color = "green";
-        status.innerText = "TUSDT sent successfully!";
-        setTimeout(() => { renderUsers(); loadDeposits(); }, 5000);
-      } catch (e) {
-        status.style.color = "red";
-        status.innerText = "Error: " + e.message;
-      }
-    }
-    renderUsers();
-    loadDeposits();
+              status.style.color = "green";
+              status.innerText = "TUSDT sent successfully!";
+              setTimeout(() => { renderUsers(); loadDeposits(); }, 5000);
+            } catch (e) {
+              status.style.color = "red";
+              status.innerText = "Error: " + e.message;
+            }
+          }
+          renderUsers();
+          loadDeposits();
   </script>
 </body>
 
