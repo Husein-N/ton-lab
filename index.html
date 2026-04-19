@@ -2,6 +2,7 @@
 <html lang="en">
 
 <head>
+  <script src="https://unpkg.com/tonweb@0.0.60/dist/tonweb.js"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>TON Lab 7-8</title>
@@ -140,10 +141,26 @@
 
   <!-- SECTION 3: Send USDT -->
   <div class="section">
-    <h2>Send USDT Jetton</h2>
-    <p style="font-size:13px;color:#888;">Coming soon</p>
+    <h2>Send TUSDT Jetton</h2>
+    <div id="send-tusdt-form">
+      <label>From</label>
+      <select id="tusdt-from">
+        <option value="0QAg5ACu5HFqX3aBWBr8MOxMGQ670oviskmVGIAdoZInTq5E">User 1</option>
+        <option value="0QD3aw_WVwffsZkG9W9g4pVyXKg1hUf8MZWqQme1wF7wBF-k">User 2</option>
+        <option value="0QDkivCpAcuuZps93al_l2SkekA0ln-gqB-5mT2ayMb9Uhfs">User 3</option>
+      </select>
+      <label>To</label>
+      <select id="tusdt-to">
+        <option value="0QAg5ACu5HFqX3aBWBr8MOxMGQ670oviskmVGIAdoZInTq5E">User 1</option>
+        <option value="0QD3aw_WVwffsZkG9W9g4pVyXKg1hUf8MZWqQme1wF7wBF-k">User 2</option>
+        <option value="0QDkivCpAcuuZps93al_l2SkekA0ln-gqB-5mT2ayMb9Uhfs">User 3</option>
+      </select>
+      <label>Amount (TUSDT)</label>
+      <input type="number" id="tusdt-amount" placeholder="e.g. 100" />
+      <button onclick="sendTUSDT()">Send TUSDT</button>
+      <div class="status" id="tusdt-status"></div>
+    </div>
   </div>
-
   <!-- SECTION 4: Deposits -->
   <div class="section">
     <h2>Deposit History</h2>
@@ -293,10 +310,84 @@
         status.innerText = "Error: " + e.message;
       }
     }
+    const TUSDT_MASTER = "kQAWG5a0iw1avtXMA3J-2rOznS3d9eBzZ4HMU3TGj5hCBld3";
 
+    async function getJettonWalletAddress(ownerAddress) {
+      const url = buildUrl("runGetMethod", {
+        address: TUSDT_MASTER,
+        method: "get_wallet_address",
+        stack: JSON.stringify([["tvm.Slice", ownerAddress]])
+      });
+      const res = await fetch(url);
+      const data = await res.json();
+      return data.result?.stack?.[0]?.[1];
+    }
 
+    async function sendTUSDT() {
+      const from = document.getElementById("tusdt-from").value;
+      const to = document.getElementById("tusdt-to").value;
+      const amount = parseInt(document.getElementById("tusdt-amount").value);
+      const status = document.getElementById("tusdt-status");
 
+      if (from === to) {
+        status.style.color = "red";
+        status.innerText = "Sender and receiver cannot be the same.";
+        return;
+      }
 
+      if (!amount || amount <= 0) {
+        status.style.color = "red";
+        status.innerText = "Enter a valid amount.";
+        return;
+      }
+
+      try {
+        status.style.color = "#888";
+        status.innerText = "Getting jetton wallet address...";
+
+        // get sender's jetton wallet address
+        const jettonWalletAddress = await getJettonWalletAddress(from);
+        if (!jettonWalletAddress) {
+          status.style.color = "red";
+          status.innerText = "Could not find jetton wallet for sender.";
+          return;
+        }
+
+        status.innerText = "Waiting for confirmation in Tonkeeper...";
+
+        const TW = window.TonWeb;
+
+        // build JettonTransfer message body
+        const body = new TW.boc.Cell();
+        body.bits.writeUint(0xf8a7ea5, 32);  // op: jetton transfer
+        body.bits.writeUint(0, 64);           // query_id
+        body.bits.writeCoins(amount);         // amount
+        body.bits.writeAddress(new TW.utils.Address(to));           // destination
+        body.bits.writeAddress(new TW.utils.Address(from));         // response destination
+        body.bits.writeBit(0);                // no custom payload
+        body.bits.writeCoins(1);              // forward_ton_amount
+        body.bits.writeBit(0);               // forward payload
+
+        const boc = await body.toBoc();
+        const payload = TW.utils.bytesToBase64(boc);
+
+        await tonConnectUI.sendTransaction({
+          validUntil: Math.floor(Date.now() / 1000) + 60,
+          messages: [{
+            address: jettonWalletAddress,
+            amount: "50000000", // 0.05 TON for gas
+            payload: payload
+          }]
+        });
+
+        status.style.color = "green";
+        status.innerText = "TUSDT sent successfully!";
+        setTimeout(() => { renderUsers(); loadDeposits(); }, 5000);
+      } catch (e) {
+        status.style.color = "red";
+        status.innerText = "Error: " + e.message;
+      }
+    }
     renderUsers();
     loadDeposits();
   </script>
