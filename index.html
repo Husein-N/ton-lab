@@ -313,14 +313,16 @@
     const TUSDT_MASTER = "kQAWG5a0iw1avtXMA3J-2rOznS3d9eBzZ4HMU3TGj5hCBld3";
 
     async function getJettonWalletAddress(ownerAddress) {
-      const url = buildUrl("runGetMethod", {
-        address: TUSDT_MASTER,
-        method: "get_wallet_address",
-        stack: JSON.stringify([["tvm.Slice", ownerAddress]])
-      });
-      const res = await fetch(url);
-      const data = await res.json();
-      return data.result?.stack?.[0]?.[1];
+      try {
+        const url = `https://testnet.toncenter.com/api/v2/runGetMethod?address=${encodeURIComponent(TUSDT_MASTER)}&method=get_wallet_address&stack=%5B%5B%22tvm.Slice%22%2C%22${encodeURIComponent(ownerAddress)}%22%5D%5D&api_key=${API_KEY}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        console.log("Jetton wallet response:", data);
+        return data.result?.stack?.[0]?.[1];
+      } catch (e) {
+        console.error("getJettonWalletAddress error:", e);
+        return null;
+      }
     }
 
     async function sendTUSDT() {
