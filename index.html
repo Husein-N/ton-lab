@@ -310,15 +310,17 @@
         status.innerText = "Error: " + e.message;
       }
     }
-    const TUSDT_MASTER = "kQAWG5a0iw1avtXMA3J-2rOznS3d9eBzZ4HMU3TGj5hCBld3";
+    const TUSDT_MASTER = "0QAWG5a0iw1avtXMA3J-2rOznS3d9eBzZ4HMU3TGj5hCBgqy";
 
     async function getJettonWalletAddress(ownerAddress) {
       try {
-        const url = `https://testnet.toncenter.com/api/v2/runGetMethod?address=${encodeURIComponent(TUSDT_MASTER)}&method=get_wallet_address&stack=%5B%5B%22tvm.Slice%22%2C%22${encodeURIComponent(ownerAddress)}%22%5D%5D&api_key=${API_KEY}`;
-        const res = await fetch(url);
+        const url = `https://testnet.tonapi.io/v2/blockchain/accounts/${encodeURIComponent(TUSDT_MASTER)}/methods/get_wallet_address?args=${encodeURIComponent(ownerAddress)}`;
+        const res = await fetch(url, {
+          headers: { "Accept": "application/json" }
+        });
         const data = await res.json();
         console.log("Jetton wallet response:", data);
-        return data.result?.stack?.[0]?.[1];
+        return data.decoded?.jetton_wallet_address;
       } catch (e) {
         console.error("getJettonWalletAddress error:", e);
         return null;
