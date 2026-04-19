@@ -297,7 +297,8 @@
             jettonData.operations.forEach(op => {
               if (op.destination?.address === userRaw && op.amount) {
                 const rawAmount = parseInt(op.amount);
-                if (rawAmount < 10000) return; // skip dust/failed amounts (< 0.01 TUSDT)                const amount = (rawAmount / 1e6).toFixed(2);
+                if (rawAmount < 10000) return;
+                const amount = (rawAmount / 1e6).toFixed(2);
                 if (op.operation === "mint") {
                   html += `<div class="tx-item" style="color:#9b59b6;">🏭 +${amount} TUSDT (minted)</div>`;
                 } else {
