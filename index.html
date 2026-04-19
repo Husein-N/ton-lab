@@ -349,28 +349,40 @@
         status.style.color = "#888";
         status.innerText = "Getting jetton wallet address...";
 
-        // get sender's jetton wallet address
-        const jettonWalletAddress = await getJettonWalletAddress(from);
-        if (!jettonWalletAddress) {
+        // get raw jetton wallet address
+        const rawJettonWallet = await getJettonWalletAddress(from);
+        if (!rawJettonWallet) {
           status.style.color = "red";
           status.innerText = "Could not find jetton wallet for sender.";
+          return;
+        }
+
+        // convert raw address to friendly format using TONCenter
+        const detectUrl = `https://testnet.toncenter.com/api/v2/detectAddress?address=${encodeURIComponent(rawJettonWallet)}&api_key=${API_KEY}`;
+        const detectRes = await fetch(detectUrl);
+        const detectData = await detectRes.json();
+        const jettonWalletAddress = detectData.result?.bounceable?.b64url;
+
+        console.log("Jetton wallet friendly address:", jettonWalletAddress);
+
+        if (!jettonWalletAddress) {
+          status.style.color = "red";
+          status.innerText = "Could not convert jetton wallet address.";
           return;
         }
 
         status.innerText = "Waiting for confirmation in Tonkeeper...";
 
         const TW = window.TonWeb;
-
-        // build JettonTransfer message body
         const body = new TW.boc.Cell();
-        body.bits.writeUint(0xf8a7ea5, 32);  // op: jetton transfer
-        body.bits.writeUint(0, 64);           // query_id
-        body.bits.writeCoins(amount);         // amount
-        body.bits.writeAddress(new TW.utils.Address(to));           // destination
-        body.bits.writeAddress(new TW.utils.Address(from));         // response destination
-        body.bits.writeBit(0);                // no custom payload
-        body.bits.writeCoins(1);              // forward_ton_amount
-        body.bits.writeBit(0);               // forward payload
+        body.bits.writeUint(0xf8a7ea5, 32);
+        body.bits.writeUint(0, 64);
+        body.bits.writeCoins(amount);
+        body.bits.writeAddress(new TW.utils.Address(to));
+        body.bits.writeAddress(new TW.utils.Address(from));
+        body.bits.writeBit(0);
+        body.bits.writeCoins(1);
+        body.bits.writeBit(0);
 
         const boc = await body.toBoc();
         const payload = TW.utils.bytesToBase64(boc);
@@ -379,7 +391,7 @@
           validUntil: Math.floor(Date.now() / 1000) + 60,
           messages: [{
             address: jettonWalletAddress,
-            amount: "50000000", // 0.05 TON for gas
+            amount: "50000000",
             payload: payload
           }]
         });
