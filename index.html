@@ -289,7 +289,7 @@
                   html += `<div class="tx-item" style="color:#9b59b6;">🏭 +${amount} TUSDT (minted)</div>`;
                 } else {
                   const from = op.source?.address ? op.source.address.slice(0, 10) : "unknown";
-                  html += `<div class="tx-item" style="color:#0088cc;">🪙 +${amount} TUSDT from ${from}...</div>`;
+                  html += `<div class="tx-item" style="color:#0088cc;">$ +${amount} TUSDT from ${from}...</div>`;
                 }
                 foundJetton = true;
               }
