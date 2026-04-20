@@ -270,7 +270,7 @@
           if (!data.ok) {
             html += `<div class="tx-item" style="color:orange;">API error: ${data.error}</div>`;
           } else {
-            const txs = data.result || [];
+            const txs = (data.result || []).sort((a, b) => b.utime - a.utime);
             let found = false;
             txs.forEach(tx => {
               const rawValue = parseInt(tx.in_msg?.value || "0");
@@ -294,7 +294,8 @@
 
           if (jettonData.operations && jettonData.operations.length > 0) {
             let foundJetton = false;
-            jettonData.operations.forEach(op => {
+            const sortedOps = (jettonData.operations || []).sort((a, b) => b.utime - a.utime);
+            sortedOps.forEach(op => {
               if (op.destination?.address === userRaw && op.amount) {
                 const rawAmount = parseInt(op.amount);
                 if (rawAmount < 10000) return;
